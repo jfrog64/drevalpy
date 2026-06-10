@@ -1,4 +1,4 @@
-name: Run drevalpy Tests
+name: My Run drevalpy Tests
 
 on:
   push:
@@ -7,6 +7,12 @@ on:
   pull_request:
     branches:
       - "*"
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to test"
+        required: true
+        default: ""
 
 jobs:
   tests:
@@ -29,6 +35,8 @@ jobs:
     steps:
       - name: Check out the repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.branch }}
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v6
@@ -97,6 +105,8 @@ jobs:
     steps:
       - name: Check out the repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.branch }}
 
       - name: Set up Python 3.13
         uses: actions/setup-python@v6
