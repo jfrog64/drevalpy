@@ -14,6 +14,8 @@ __all__ = [
     "RandomForest",
     "RandomForestTargetMut",
     "ElasticNetTargetMut",
+    "RandomForestTargetMut893",
+    "ElasticNetTargetMut893",
     "SVMRegressor",
     "SimpleNeuralNetwork",
     "MultiViewNeuralNetwork",
@@ -57,7 +59,12 @@ from .baselines.sklearn_models import (
     RandomForest,
     SVMRegressor,
 )
-from .baselines.target_mut_sklearn import ElasticNetTargetMut, RandomForestTargetMut
+from .baselines.target_mut_sklearn import (
+    ElasticNetTargetMut,
+    ElasticNetTargetMut893,
+    RandomForestTargetMut,
+    RandomForestTargetMut893,
+)
 from .DIPK.dipk import DIPKModel
 from .drp_model import DRPModel
 from .DrugGNN import DrugGNN
@@ -96,6 +103,8 @@ MULTI_DRUG_MODEL_FACTORY: dict[str, type[DRPModel]] = {
     "RandomForest": RandomForest,
     "RandomForestTargetMut": RandomForestTargetMut,
     "ElasticNetTargetMut": ElasticNetTargetMut,
+    "RandomForestTargetMut893": RandomForestTargetMut893,
+    "ElasticNetTargetMut893": ElasticNetTargetMut893,
     "MultiViewRandomForest": MultiViewRandomForest,
     "SVR": SVMRegressor,
     # Other Baselines

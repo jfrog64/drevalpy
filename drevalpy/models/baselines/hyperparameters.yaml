@@ -296,7 +296,8 @@ MultiViewLightGBM:
     - 0.1
     - 1
 # 2026-07-17: gepoolte Modelle + target-gematchtes funktionelles Mutationsstatus-Feature (DrEval).
-# Wie RandomForest/ElasticNet, plus target_*-Parameter (Defaults im Modell; hier explizit dokumentiert).
+# Wie RandomForest/ElasticNet, plus target_*-Parameter. HPs aus nested-HPO (RF max_depth=30, EN alpha=0.05).
+# Vier Registry-Namen: *TargetMut = 270 Gene (landmark_genes_reduced), *TargetMut893 = 893 (landmark_plus_clinical_drivers).
 RandomForestTargetMut:
   cell_line_views:
     - gene_expression
@@ -312,6 +313,29 @@ RandomForestTargetMut:
     - -1
   criterion:
     - squared_error
+  gene_list:
+    - landmark_genes_reduced
+  target_missing:
+    - missing
+  target_include_aligned:
+    - true
+RandomForestTargetMut893:
+  cell_line_views:
+    - gene_expression
+  drug_views:
+    - fingerprints
+  n_estimators:
+    - 100
+  max_depth:
+    - 30
+  max_samples:
+    - 0.2
+  n_jobs:
+    - -1
+  criterion:
+    - squared_error
+  gene_list:
+    - landmark_plus_clinical_drivers
   target_missing:
     - missing
   target_include_aligned:
@@ -324,7 +348,24 @@ ElasticNetTargetMut:
   l1_ratio:
     - 0.5
   alpha:
-    - 0.2
+    - 0.05
+  gene_list:
+    - landmark_genes_reduced
+  target_missing:
+    - missing
+  target_include_aligned:
+    - true
+ElasticNetTargetMut893:
+  cell_line_views:
+    - gene_expression
+  drug_views:
+    - fingerprints
+  l1_ratio:
+    - 0.5
+  alpha:
+    - 0.05
+  gene_list:
+    - landmark_plus_clinical_drivers
   target_missing:
     - missing
   target_include_aligned:

@@ -262,3 +262,25 @@ class ElasticNetTargetMut(_TargetMutMixin, ElasticNetModel):
     def get_model_name(cls) -> str:
         """:returns: ElasticNetTargetMut"""
         return "ElasticNetTargetMut"
+
+
+# -- 893-Gen-Varianten (nur eigener Registry-Name; Genliste kommt aus hyperparameters.yaml via gene_list) --
+# Ermöglichen den Ranking-Vergleich 270 vs 893 im selben drevalpy-Report ohne weitere Logik.
+
+
+class RandomForestTargetMut893(RandomForestTargetMut):
+    """Wie RandomForestTargetMut, aber gene_list=landmark_plus_clinical_drivers (893) via yaml."""
+
+    @classmethod
+    def get_model_name(cls) -> str:
+        """:returns: RandomForestTargetMut893"""
+        return "RandomForestTargetMut893"
+
+
+class ElasticNetTargetMut893(ElasticNetTargetMut):
+    """Wie ElasticNetTargetMut, aber gene_list=landmark_plus_clinical_drivers (893) via yaml."""
+
+    @classmethod
+    def get_model_name(cls) -> str:
+        """:returns: ElasticNetTargetMut893"""
+        return "ElasticNetTargetMut893"
