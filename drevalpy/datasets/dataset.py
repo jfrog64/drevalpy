@@ -535,6 +535,17 @@ class DrugResponseDataset:
         if self.tissue is not None:
             self._tissues = self.tissue[mask]
 
+    def _transformation_kwargs(self, response_transformation: TransformerMixin) -> dict:
+        """
+        Extra keyword arguments a group-aware transformation needs, e.g. GroupMeanCenterer.
+
+        :param response_transformation: e.g., StandardScaler or GroupMeanCenterer
+        :returns: {"groups": drug_ids} for group-aware transformations, else {}
+        """
+        if getattr(response_transformation, "requires_groups", False):
+            return {"groups": self.drug_ids}
+        return {}
+
     @pipeline_function
     def transform(self, response_transformation: TransformerMixin) -> None:
         """
@@ -542,9 +553,10 @@ class DrugResponseDataset:
 
         :param response_transformation: e.g., StandardScaler, MinMaxScaler, RobustScaler
         """
-        self._response = response_transformation.transform(self.response.reshape(-1, 1)).squeeze()
+        kwargs = self._transformation_kwargs(response_transformation)
+        self._response = response_transformation.transform(self.response.reshape(-1, 1), **kwargs).squeeze()
         if self.predictions is not None:
-            self._predictions = response_transformation.transform(self.predictions.reshape(-1, 1)).squeeze()
+            self._predictions = response_transformation.transform(self.predictions.reshape(-1, 1), **kwargs).squeeze()
 
     @pipeline_function
     def fit_transform(self, response_transformation: TransformerMixin) -> None:
@@ -553,7 +565,7 @@ class DrugResponseDataset:
 
         :param response_transformation: e.g., StandardScaler, MinMaxScaler, RobustScaler
         """
-        response_transformation.fit(self.response.reshape(-1, 1))
+        response_transformation.fit(self.response.reshape(-1, 1), **self._transformation_kwargs(response_transformation))
         self.transform(response_transformation)
 
     def inverse_transform(self, response_transformation: TransformerMixin) -> None:
@@ -562,9 +574,12 @@ class DrugResponseDataset:
 
         :param response_transformation: e.g., StandardScaler, MinMaxScaler, RobustScaler
         """
-        self._response = response_transformation.inverse_transform(self.response.reshape(-1, 1)).squeeze()
+        kwargs = self._transformation_kwargs(response_transformation)
+        self._response = response_transformation.inverse_transform(self.response.reshape(-1, 1), **kwargs).squeeze()
         if self.predictions is not None:
-            self._predictions = response_transformation.inverse_transform(self.predictions.reshape(-1, 1)).squeeze()
+            self._predictions = response_transformation.inverse_transform(
+                self.predictions.reshape(-1, 1), **kwargs
+            ).squeeze()
 
 
 @pipeline_function
