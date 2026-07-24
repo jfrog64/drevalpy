@@ -47,7 +47,36 @@ _DEFAULT_CURATED = "/mnt/data/genomics/CDR/DrEval/analysis_science/curated_drug_
 _DEFAULT_STATUS = "/mnt/data/genomics/CDR/DrEval/analysis_science/functional_status_matrix.csv"
 
 
-class _TargetMutMixin:
+class _GeneListMixin:
+    """Mixin: erlaubt eine frei wählbare Genexpr-Liste über den Hyperparameter ``gene_list``.
+
+    Ausgelagert aus ``_TargetMutMixin``, damit auch Nicht-TargetMut-Modelle (z.B. reine
+    ElasticNet-Varianten auf 893 Genen) dieselbe Auswahl-Logik nutzen können.
+    """
+
+    def load_cell_line_features(self, data_path: str, dataset_name: str) -> FeatureDataset:
+        """Wie Basis, aber optional mit frei wählbarer Genexpr-Liste über den Hyperparameter `gene_list`.
+
+        Ohne `gene_list`: Basisverhalten (fest verdrahtete `landmark_genes_reduced`/270 in utils).
+        Mit `gene_list` (z.B. `"landmark_plus_clinical_drivers"`/893): diese Liste wird geladen. Da der Wert
+        in `hyperparameters.json` mitgespeichert wird, nutzt ein via `load()` wiederhergestelltes Modell
+        automatisch dieselbe Auswahl bei train UND predict — sonst würde ein auf 893 trainiertes Modell beim
+        Standard-predict 270 Features bekommen (Dimensions-Mismatch). Greift nur für den gene_expression-View.
+
+        :param data_path: Pfad zu den Daten
+        :param dataset_name: Name des Datensatzes
+        :returns: FeatureDataset mit den (ggf. per gene_list reduzierten) Zelllinien-Features
+        """
+        gene_list = self.hyperparameters.get("gene_list", None)
+        if gene_list and self.cell_line_views == ["gene_expression"]:
+            return load_and_select_gene_features(
+                feature_type="gene_expression", gene_list=gene_list,
+                data_path=data_path, dataset_name=dataset_name,
+            )
+        return super().load_cell_line_features(data_path, dataset_name)
+
+
+class _TargetMutMixin(_GeneListMixin):
     """Mixin, das die Feature-Matrix um das target-gematchte Mutationsstatus-Feature erweitert."""
 
     def build_model(self, hyperparameters: dict):
@@ -104,27 +133,6 @@ class _TargetMutMixin:
         self._status = {
             (s, g): st for s, g, st in zip(status["sample"], status["gene"], status["status"])
         }
-
-    def load_cell_line_features(self, data_path: str, dataset_name: str) -> FeatureDataset:
-        """Wie Basis, aber optional mit frei wählbarer Genexpr-Liste über den Hyperparameter `gene_list`.
-
-        Ohne `gene_list`: Basisverhalten (fest verdrahtete `landmark_genes_reduced`/270 in utils).
-        Mit `gene_list` (z.B. `"landmark_plus_clinical_drivers"`/893): diese Liste wird geladen. Da der Wert
-        in `hyperparameters.json` mitgespeichert wird, nutzt ein via `load()` wiederhergestelltes Modell
-        automatisch dieselbe Auswahl bei train UND predict — sonst würde ein auf 893 trainiertes Modell beim
-        Standard-predict 270 Features bekommen (Dimensions-Mismatch). Greift nur für den gene_expression-View.
-
-        :param data_path: Pfad zu den Daten
-        :param dataset_name: Name des Datensatzes
-        :returns: FeatureDataset mit den (ggf. per gene_list reduzierten) Zelllinien-Features
-        """
-        gene_list = self.hyperparameters.get("gene_list", None)
-        if gene_list and self.cell_line_views == ["gene_expression"]:
-            return load_and_select_gene_features(
-                feature_type="gene_expression", gene_list=gene_list,
-                data_path=data_path, dataset_name=dataset_name,
-            )
-        return super().load_cell_line_features(data_path, dataset_name)
 
     def _target_feature_matrix(self, cell_line_ids: np.ndarray, drug_ids: np.ndarray) -> np.ndarray:
         """Erzeugt die (n_rows × n_target_features)-Matrix für die gegebenen (Zelllinie, Drug)-Paare."""

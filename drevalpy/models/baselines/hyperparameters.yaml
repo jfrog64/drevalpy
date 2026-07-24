@@ -370,3 +370,86 @@ ElasticNetTargetMut893:
     - missing
   target_include_aligned:
     - true
+
+# --- Drug-Mean-Residualisierungs-Faktorial (EN, 2026-07-24) ---
+# Alle EN-Zellen: gene_expression-only + fingerprints, l1=0.5/alpha=0.05 (HPO-validiert),
+# damit sich die 8 Faktorial-Zellen NUR in {270,893} x {Mut} x {resi} unterscheiden.
+ElasticNetGeneExpr:
+  cell_line_views:
+    - gene_expression
+  drug_views:
+    - fingerprints
+  l1_ratio:
+    - 0.5
+  alpha:
+    - 0.05
+  gene_list:
+    - landmark_genes_reduced
+
+ElasticNetGeneExpr893:
+  cell_line_views:
+    - gene_expression
+  drug_views:
+    - fingerprints
+  l1_ratio:
+    - 0.5
+  alpha:
+    - 0.05
+  gene_list:
+    - landmark_plus_clinical_drivers
+
+ElasticNetResid:
+  cell_line_views:
+    - gene_expression
+  drug_views:
+    - fingerprints
+  l1_ratio:
+    - 0.5
+  alpha:
+    - 0.05
+  gene_list:
+    - landmark_genes_reduced
+
+ElasticNetResid893:
+  cell_line_views:
+    - gene_expression
+  drug_views:
+    - fingerprints
+  l1_ratio:
+    - 0.5
+  alpha:
+    - 0.05
+  gene_list:
+    - landmark_plus_clinical_drivers
+
+ElasticNetTargetMutResid:
+  cell_line_views:
+    - gene_expression
+  drug_views:
+    - fingerprints
+  l1_ratio:
+    - 0.5
+  alpha:
+    - 0.05
+  gene_list:
+    - landmark_genes_reduced
+  target_missing:
+    - missing
+  target_include_aligned:
+    - true
+
+ElasticNetTargetMutResid893:
+  cell_line_views:
+    - gene_expression
+  drug_views:
+    - fingerprints
+  l1_ratio:
+    - 0.5
+  alpha:
+    - 0.05
+  gene_list:
+    - landmark_plus_clinical_drivers
+  target_missing:
+    - missing
+  target_include_aligned:
+    - true

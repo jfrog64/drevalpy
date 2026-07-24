@@ -16,6 +16,12 @@ __all__ = [
     "ElasticNetTargetMut",
     "RandomForestTargetMut893",
     "ElasticNetTargetMut893",
+    "ElasticNetGeneExpr",
+    "ElasticNetGeneExpr893",
+    "ElasticNetResid",
+    "ElasticNetResid893",
+    "ElasticNetTargetMutResid",
+    "ElasticNetTargetMutResid893",
     "SVMRegressor",
     "SimpleNeuralNetwork",
     "MultiViewNeuralNetwork",
@@ -58,6 +64,14 @@ from .baselines.sklearn_models import (
     LassoModel,
     RandomForest,
     SVMRegressor,
+)
+from .baselines.drug_resid_sklearn import (
+    ElasticNetGeneExpr,
+    ElasticNetGeneExpr893,
+    ElasticNetResid,
+    ElasticNetResid893,
+    ElasticNetTargetMutResid,
+    ElasticNetTargetMutResid893,
 )
 from .baselines.target_mut_sklearn import (
     ElasticNetTargetMut,
@@ -105,6 +119,12 @@ MULTI_DRUG_MODEL_FACTORY: dict[str, type[DRPModel]] = {
     "ElasticNetTargetMut": ElasticNetTargetMut,
     "RandomForestTargetMut893": RandomForestTargetMut893,
     "ElasticNetTargetMut893": ElasticNetTargetMut893,
+    "ElasticNetGeneExpr": ElasticNetGeneExpr,
+    "ElasticNetGeneExpr893": ElasticNetGeneExpr893,
+    "ElasticNetResid": ElasticNetResid,
+    "ElasticNetResid893": ElasticNetResid893,
+    "ElasticNetTargetMutResid": ElasticNetTargetMutResid,
+    "ElasticNetTargetMutResid893": ElasticNetTargetMutResid893,
     "MultiViewRandomForest": MultiViewRandomForest,
     "SVR": SVMRegressor,
     # Other Baselines
