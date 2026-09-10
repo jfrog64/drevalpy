@@ -228,6 +228,10 @@ class _DrugResponsePytorchDataset(PytorchDataset):
 class DrugGNN(DRPModel):
     """DrugGNN model."""
 
+    #: Gene list used to subset gene_expression. Overridable via the "gene_list" hyperparameter.
+    #: The default reproduces the previously hard-coded behaviour.
+    gene_list: str | None = "landmark_genes_reduced"
+
     def __init__(self):
         """Initialize the DrugGNN model."""
         super().__init__()
@@ -261,12 +265,17 @@ class DrugGNN(DRPModel):
     def build_model(self, hyperparameters: dict[str, Any]) -> None:
         """Build the model.
 
-        :param hyperparameters: The hyperparameters.
+        :param hyperparameters: The hyperparameters. May contain gene_list (str | None), the gene
+            list used to subset gene_expression, e.g., landmark_genes_reduced. None loads all genes.
+            Optional, defaults to the class attribute landmark_genes_reduced.
         """
         # Log hyperparameters to wandb if enabled
         self.log_hyperparameters(hyperparameters)
 
         self.hyperparameters = hyperparameters
+        # Kept in self.hyperparameters, so save_model()/load_model() carry it and predict() uses
+        # the same gene space the model was trained on.
+        self.gene_list = hyperparameters.get("gene_list", type(self).gene_list)
 
     def _loader_kwargs(self) -> dict[str, Any]:
         num_workers = int(self.hyperparameters.get("num_workers", 4))
@@ -423,7 +432,7 @@ class DrugGNN(DRPModel):
         """
         return load_and_select_gene_features(
             feature_type="gene_expression",
-            gene_list="landmark_genes_reduced",
+            gene_list=self.gene_list,
             data_path=data_path,
             dataset_name=dataset_name,
         )
@@ -485,6 +494,11 @@ class DrugGNN(DRPModel):
         config_path = path / "config.json"
         with open(config_path) as f:
             self.hyperparameters = json.load(f)
+
+        # load_model() does not go through build_model, so the gene list has to be restored here as
+        # well. Without this the loaded model would fall back to the class default and predict on a
+        # different gene space than it was trained on.
+        self.gene_list = self.hyperparameters.get("gene_list", type(self).gene_list)
 
         self.model = DrugGNNModule.load_from_checkpoint(
             path / "model.ckpt",
