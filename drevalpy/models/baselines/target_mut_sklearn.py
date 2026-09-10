@@ -40,6 +40,7 @@ from sklearn.preprocessing import StandardScaler
 from drevalpy.datasets.dataset import DrugResponseDataset, FeatureDataset
 
 from ..utils import load_and_select_gene_features
+from .singledrug_baselines import SingleDrugRandomForest
 from .sklearn_models import ElasticNetModel, RandomForest, SklearnModel
 
 # Default-Pfade der kuratierten Tabellen (Claude-Science-Deliverables)
@@ -292,3 +293,25 @@ class ElasticNetTargetMut893(ElasticNetTargetMut):
     def get_model_name(cls) -> str:
         """:returns: ElasticNetTargetMut893"""
         return "ElasticNetTargetMut893"
+
+
+# -- Single-Drug-Variante (2026-08-06) ------------------------------------------------------------
+# Gegenstueck zu SingleDrugRandomForest: ein Modell PRO Drug, aber mit dem target-gematchten
+# Mutationsblock. Beantwortet die Frage der Kollegin ("nutzt das Modell das richtige Gen?") am
+# offiziellen per-Drug-Modell — der reine SingleDrugRandomForest hat nur gene_expression und kann
+# den Mutationsstatus deshalb prinzipiell nicht zeigen (Befund gp20260805_singledrug_all893).
+#
+# ACHTUNG bei der Auswertung: innerhalb EINES Drugs ist das Zielgen fix, der Mutationsblock also
+# der One-hot-Status eines einzigen Gens. `target_sensitizing` ist dann eine exakte Dublette
+# genau der Statusspalte, die dem sensitiven Status entspricht — die Kollinearitaetsfalle aus
+# Teilauftrag C tritt hier IMMER auf, nicht nur bei selektiven Drugs. Einzelne Spalten-Importances
+# sind daher systematisch untertrieben; auswertbar ist nur der Block gemeinsam (Block-Permutation).
+
+
+class SingleDrugRandomForestTargetMut(_TargetMutMixin, SingleDrugRandomForest):
+    """Ein RandomForest pro Drug + target-gematchtes funktionelles Mutationsstatus-Feature."""
+
+    @classmethod
+    def get_model_name(cls) -> str:
+        """:returns: SingleDrugRandomForestTargetMut"""
+        return "SingleDrugRandomForestTargetMut"

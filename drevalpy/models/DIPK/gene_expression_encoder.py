@@ -142,39 +142,60 @@ class DataSet(Dataset, ABC):
 
 
 def train_gene_expession_autoencoder(
-    gene_expression_input: np.ndarray, gene_expression_input_early_stopping: np.ndarray, epochs_autoencoder: int = 100
+    gene_expression_input: np.ndarray,
+    gene_expression_input_early_stopping: np.ndarray,
+    epochs_autoencoder: int = 100,
+    encoder_state: dict | None = None,
+    decoder_state: dict | None = None,
+    lr: float = 1e-4,
+    patience: int = 3,
+    batch_size: int = 1024,
 ) -> GeneExpressionEncoder:
     """Train the autoencoder model for gene expression data with early stopping.
 
     :param gene_expression_input: gene expression data
     :param gene_expression_input_early_stopping: validation data for early stopping
     :param epochs_autoencoder: number of epochs for training the autoencoder
+    :param encoder_state: optional state dict to warm start the encoder from (e.g. pretrained on TCGA)
+    :param decoder_state: optional state dict to warm start the decoder from
+    :param lr: learning rate of the Adam optimizer
+    :param patience: number of epochs without improvement before early stopping
+    :param batch_size: mini batch size. The DIPK default of 1024 assumes the response row matrix
+        (every cell line repeated once per response). Callers that train on the unique cell lines
+        instead (a few hundred rows) need a smaller batch to get a comparable number of gradient
+        steps -- with 1024 an epoch would be a single step.
     :return: trained encoder model
     """
-    lr = 1e-4
-    batch_size = 1024
     noising = True
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # create model
     encoder = GeneExpressionEncoder(len(gene_expression_input[0])).to(device)
     decoder = GeneExpressionDecoder(len(gene_expression_input[0])).to(device)
+    # Warm start: with pretrained weights this is a fine tuning run instead of training from scratch.
+    if encoder_state is not None:
+        encoder.load_state_dict(encoder_state)
+    if decoder_state is not None:
+        decoder.load_state_dict(decoder_state)
     loss_func = nn.MSELoss()
     params = [{"params": encoder.parameters()}, {"params": decoder.parameters()}]
     optimizer = optim.Adam(params, lr=lr)
 
     # load data
+    # The full training matrix stays in host memory, only the mini batches are moved to the device
+    # (the training loop below already calls .to(device) per batch). With large gene lists the
+    # complete matrix does not fit into GPU memory: 230k response rows x 11,883 genes x 4 byte is
+    # ~11 GB, while a batch of 1024 rows is ~50 MB. Semantics are unchanged.
     my_collate = CollateFn()
-    gene_expression_tensor = torch.tensor(gene_expression_input, dtype=torch.float32).to(device)
+    gene_expression_tensor = torch.from_numpy(np.asarray(gene_expression_input, dtype=np.float32))
     train_loader = DataLoader(
         DataSet(gene_expression_tensor), batch_size=batch_size, shuffle=True, collate_fn=my_collate
     )
 
-    # prepare early stopping validation data
-    gene_expression_val_tensor = torch.tensor(gene_expression_input_early_stopping, dtype=torch.float32).to(device)
+    # prepare early stopping validation data (kept on the host as well, evaluated in chunks below)
+    gene_expression_val_tensor = torch.from_numpy(np.asarray(gene_expression_input_early_stopping, dtype=np.float32))
 
     # early stopping parameters
-    patience = 3
     best_val_loss = float("inf")
     epochs_without_improvement = 0
 
@@ -207,8 +228,16 @@ def train_gene_expession_autoencoder(
         encoder.eval()
         decoder.eval()
         with torch.no_grad():
-            val_output = decoder(encoder(gene_expression_val_tensor))
-            val_loss = loss_func(val_output, gene_expression_val_tensor).item()
+            # Chunked forward pass with exact sum/count accumulation: identical to
+            # MSELoss over the whole validation matrix, but without holding it on the GPU.
+            val_squared_error = 0.0
+            val_elements = 0
+            for start in range(0, len(gene_expression_val_tensor), batch_size):
+                val_batch = gene_expression_val_tensor[start : start + batch_size].to(device)
+                val_output = decoder(encoder(val_batch))
+                val_squared_error += float(((val_output - val_batch) ** 2).sum().item())
+                val_elements += val_batch.numel()
+            val_loss = val_squared_error / val_elements
 
         print(f"DIPK Autoenc. Epoch: {epoch_index}, Train Loss: {epoch_loss}, Val Loss: {val_loss}")
 

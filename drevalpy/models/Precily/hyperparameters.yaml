@@ -1,15 +1,25 @@
+# Geaendert 2026-09-02 (CC, Playground-Klon): LeakyReLU-Neutraining gegen das Vorhersage-Plateau
+# des Laufs gp20260828_precily_final (tote ReLU-Schicht -> Konstante -0,145292 bei 6,6 % der Paare).
+# Vorabtest 20260902_precily_activation_probe.csv: relu+lr1e-3 = Plateau (Median 2,0 %, max 25,9 %),
+# alle anderen Varianten plateaufrei (0,2 % = Rundungsbindungen). Deshalb hier lr 1e-4 fest und
+# leaky_relu fest; getunt werden nur noch dropout und epochs (6 Sets).
+# Original liegt als precily_hyperparameters_orig_20260902.yaml im Scratchpad; Upstream-Default
+# ist activation=relu, lr [1e-3, 1e-4, 1e-5], dropout [0.1, 0.2, 0.3].
 Precily:
   learning_rate:
-    - 1.0e-3
     - 1.0e-4
-    - 1.0e-5
   dropout:
     - 0.1
     - 0.2
     - 0.3
   epochs:
     - 50
+    - 100
   batch_size:
     - 128
   seed:
     - 42
+  activation:
+    - leaky_relu
+  negative_slope:
+    - 0.01

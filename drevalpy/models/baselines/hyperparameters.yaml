@@ -174,6 +174,11 @@ SingleDrugRandomForest:
   cell_line_views:
     - gene_expression
     #- proteomics
+  # 2026-08-05: gene_list ist jetzt ein Hyperparameter (vorher in load_single_cell_line_view fest
+  # verdrahtet auf landmark_genes_reduced). Die 270er Liste enthaelt KEINES der kuratierten Treibergene
+  # (BRAF, EGFR, JAK2, ...) -> Feature-Importances waren mechanistisch nicht auswertbar. Darum 893.
+  gene_list:
+    - landmark_plus_clinical_drivers
   n_estimators:
     - 100
   max_depth:
@@ -194,6 +199,30 @@ SingleDrugRandomForest:
     - 0.3
   proteomics_normalization_downshift:
     - 1.8
+
+# 2026-08-06: Single-Drug-RF MIT target-gematchtem Mutationsblock. Gleiche HPs wie
+# SingleDrugRandomForest, damit sich die beiden Laeufe NUR im Mut-Feature unterscheiden.
+SingleDrugRandomForestTargetMut:
+  cell_line_views:
+    - gene_expression
+  gene_list:
+    - landmark_plus_clinical_drivers
+  n_estimators:
+    - 100
+  max_depth:
+    - 5
+    - 10
+    - 30
+  max_samples:
+    - 0.2
+  n_jobs:
+    - -1
+  criterion:
+    - squared_error
+  target_missing:
+    - missing
+  target_include_aligned:
+    - true
 
 SingleDrugElasticNet:
   cell_line_views:
@@ -453,3 +482,441 @@ ElasticNetTargetMutResid893:
     - missing
   target_include_aligned:
     - true
+
+# --- RF auf DIPKs Feature-Bausteinen (AE + gepooltes MolGNet), Ablations-Faktorial 2026-08-06 ---
+# Alle sechs Zellen erben die RF-Hyperparameter der Referenz (n_estimators 100, max_depth 30,
+# max_samples 0.2) — damit unterscheiden sich die Arme NUR im Feature-Satz.
+# Referenzzellen des Faktorials sind die bestehenden RandomForest (893 via gene_list) und
+# RandomForestTargetMut893.
+# AE: Genraum + log2(TPM+1) exakt wie DIPKLOG; batch 64 statt DIPKs 1024, weil auf den EINDEUTIGEN
+# Trainingszelllinien trainiert wird (~800 Zeilen, mit 1024 waere eine Epoche ein einziger Schritt).
+# MolGNet: die Knoten-Embeddings haben 768 Dims (nicht 43 wie im Auftrag angenommen)
+# -> mean+max-Pooling ergibt 1536 Drug-Features.
+# 2026-08-06: -Mut-Referenzzelle des DIPK-Feature-Faktorials. Identisch zu RandomForestTargetMut893,
+# nur ohne das Mut-Feature -- die registrierte `RandomForest`-Basis nutzt 270 Gene und waere als
+# Referenz mit dem Genraum konfundiert.
+RandomForest893:
+  cell_line_views:
+    - gene_expression
+  drug_views:
+    - fingerprints
+  n_estimators:
+    - 100
+  max_depth:
+    - 30
+  max_samples:
+    - 0.2
+  n_jobs:
+    - -1
+  criterion:
+    - squared_error
+  gene_list:
+    - landmark_plus_clinical_drivers
+
+RandomForestAE:
+  cell_line_views:
+    - gene_expression
+  drug_views:
+    - fingerprints
+  gene_list:
+    - tcga_autoencoder_genes_available
+  n_estimators:
+    - 100
+  max_depth:
+    - 30
+  max_samples:
+    - 0.2
+  n_jobs:
+    - -1
+  criterion:
+    - squared_error
+  ae_log2:
+    - true
+  # AE-Schedule aus Benchmark 2026-08-06 (815 Zelllinien x 11883 Gene, log2, Fold-Groesse real):
+  #   batch64/pat20 -> Stopp ep72,  best Val-MSE 0.970,  39 s
+  #   batch64/pat50 -> Stopp ep308, best Val-MSE 0.762, 166 s
+  #   batch32/pat50 -> Stopp ep280, best Val-MSE 0.733, 285 s   <- gewaehlt
+  # pat20 stoppt deutlich zu frueh (Val-Kurve faellt noch); 285 s/Fold sind gegen ~7 h Gesamtlauf
+  # vernachlaessigbar und der Encoder wird ohnehin je Fold nur EINMAL trainiert (AE-Cache).
+  epochs_autoencoder:
+    - 2000
+  ae_batch_size:
+    - 32
+  ae_patience:
+    - 50
+
+RandomForestAEMut:
+  cell_line_views:
+    - gene_expression
+  drug_views:
+    - fingerprints
+  gene_list:
+    - tcga_autoencoder_genes_available
+  n_estimators:
+    - 100
+  max_depth:
+    - 30
+  max_samples:
+    - 0.2
+  n_jobs:
+    - -1
+  criterion:
+    - squared_error
+  ae_log2:
+    - true
+  # AE-Schedule aus Benchmark 2026-08-06 (815 Zelllinien x 11883 Gene, log2, Fold-Groesse real):
+  #   batch64/pat20 -> Stopp ep72,  best Val-MSE 0.970,  39 s
+  #   batch64/pat50 -> Stopp ep308, best Val-MSE 0.762, 166 s
+  #   batch32/pat50 -> Stopp ep280, best Val-MSE 0.733, 285 s   <- gewaehlt
+  # pat20 stoppt deutlich zu frueh (Val-Kurve faellt noch); 285 s/Fold sind gegen ~7 h Gesamtlauf
+  # vernachlaessigbar und der Encoder wird ohnehin je Fold nur EINMAL trainiert (AE-Cache).
+  epochs_autoencoder:
+    - 2000
+  ae_batch_size:
+    - 32
+  ae_patience:
+    - 50
+  target_missing:
+    - missing
+  target_include_aligned:
+    - true
+
+RandomForestMolGNet:
+  cell_line_views:
+    - gene_expression
+  drug_views:
+    - molgnet_pooled
+  gene_list:
+    - landmark_plus_clinical_drivers
+  n_estimators:
+    - 100
+  max_depth:
+    - 30
+  max_samples:
+    - 0.2
+  n_jobs:
+    - -1
+  criterion:
+    - squared_error
+  molgnet_pooling:
+    - mean_max
+
+RandomForestMolGNetMut:
+  cell_line_views:
+    - gene_expression
+  drug_views:
+    - molgnet_pooled
+  gene_list:
+    - landmark_plus_clinical_drivers
+  n_estimators:
+    - 100
+  max_depth:
+    - 30
+  max_samples:
+    - 0.2
+  n_jobs:
+    - -1
+  criterion:
+    - squared_error
+  molgnet_pooling:
+    - mean_max
+  target_missing:
+    - missing
+  target_include_aligned:
+    - true
+
+RandomForestAEMolGNet:
+  cell_line_views:
+    - gene_expression
+  drug_views:
+    - molgnet_pooled
+  gene_list:
+    - tcga_autoencoder_genes_available
+  n_estimators:
+    - 100
+  max_depth:
+    - 30
+  max_samples:
+    - 0.2
+  n_jobs:
+    - -1
+  criterion:
+    - squared_error
+  ae_log2:
+    - true
+  # AE-Schedule aus Benchmark 2026-08-06 (815 Zelllinien x 11883 Gene, log2, Fold-Groesse real):
+  #   batch64/pat20 -> Stopp ep72,  best Val-MSE 0.970,  39 s
+  #   batch64/pat50 -> Stopp ep308, best Val-MSE 0.762, 166 s
+  #   batch32/pat50 -> Stopp ep280, best Val-MSE 0.733, 285 s   <- gewaehlt
+  # pat20 stoppt deutlich zu frueh (Val-Kurve faellt noch); 285 s/Fold sind gegen ~7 h Gesamtlauf
+  # vernachlaessigbar und der Encoder wird ohnehin je Fold nur EINMAL trainiert (AE-Cache).
+  epochs_autoencoder:
+    - 2000
+  ae_batch_size:
+    - 32
+  ae_patience:
+    - 50
+  molgnet_pooling:
+    - mean_max
+
+RandomForestAEMolGNetMut:
+  cell_line_views:
+    - gene_expression
+  drug_views:
+    - molgnet_pooled
+  gene_list:
+    - tcga_autoencoder_genes_available
+  n_estimators:
+    - 100
+  max_depth:
+    - 30
+  max_samples:
+    - 0.2
+  n_jobs:
+    - -1
+  criterion:
+    - squared_error
+  ae_log2:
+    - true
+  # AE-Schedule aus Benchmark 2026-08-06 (815 Zelllinien x 11883 Gene, log2, Fold-Groesse real):
+  #   batch64/pat20 -> Stopp ep72,  best Val-MSE 0.970,  39 s
+  #   batch64/pat50 -> Stopp ep308, best Val-MSE 0.762, 166 s
+  #   batch32/pat50 -> Stopp ep280, best Val-MSE 0.733, 285 s   <- gewaehlt
+  # pat20 stoppt deutlich zu frueh (Val-Kurve faellt noch); 285 s/Fold sind gegen ~7 h Gesamtlauf
+  # vernachlaessigbar und der Encoder wird ohnehin je Fold nur EINMAL trainiert (AE-Cache).
+  epochs_autoencoder:
+    - 2000
+  ae_batch_size:
+    - 32
+  ae_patience:
+    - 50
+  molgnet_pooling:
+    - mean_max
+  target_missing:
+    - missing
+  target_include_aligned:
+    - true
+
+# Aufgabe A1, Option (b) (2026-09-10): identisch zu RandomForestAEMolGNetMut, nur speist sich das
+# Mut-Feature aus dem 8-Gen-Panel-Kern (AKT1 BRAF ERBB2 KRAS NRAS PIK3CA PTEN TP53) statt aus allen
+# 24 Genen. RAS_MAPK darin ohne NF1 (NF1 ist in nur einem der sechs Panels), PI3K_AKT unveraendert.
+# 23 der 48 kuratierten Substanzen verlieren dadurch ihr Gen und fallen auf Status "missing".
+RandomForestAEMolGNetMutKern8:
+  cell_line_views:
+    - gene_expression
+  drug_views:
+    - molgnet_pooled
+  gene_list:
+    - tcga_autoencoder_genes_available
+  n_estimators:
+    - 100
+  max_depth:
+    - 30
+  max_samples:
+    - 0.2
+  n_jobs:
+    - -1
+  criterion:
+    - squared_error
+  ae_log2:
+    - true
+  epochs_autoencoder:
+    - 2000
+  ae_batch_size:
+    - 32
+  ae_patience:
+    - 50
+  molgnet_pooling:
+    - mean_max
+  target_missing:
+    - missing
+  target_include_aligned:
+    - true
+  target_status_path:
+    - /mnt/data/genomics/CDR/DrEval/analysis_science/functional_status_matrix_kern8_20260910.csv
+
+# Rausch-bewusste Varianten (2026-09-03): identisch zu RandomForestAEMolGNetMut, nur
+# zusaetzlich nach der Qualitaet der Dosis-Wirkungs-Kurve gewichtet (pEC50Error).
+RandomForestAEMolGNetMutCW:
+  cell_line_views:
+    - gene_expression
+  drug_views:
+    - molgnet_pooled
+  gene_list:
+    - tcga_autoencoder_genes_available
+  n_estimators:
+    - 100
+  max_depth:
+    - 30
+  max_samples:
+    - 0.2
+  n_jobs:
+    - -1
+  criterion:
+    - squared_error
+  ae_log2:
+    - true
+  # AE-Schedule aus Benchmark 2026-08-06 (815 Zelllinien x 11883 Gene, log2, Fold-Groesse real):
+  #   batch64/pat20 -> Stopp ep72,  best Val-MSE 0.970,  39 s
+  #   batch64/pat50 -> Stopp ep308, best Val-MSE 0.762, 166 s
+  #   batch32/pat50 -> Stopp ep280, best Val-MSE 0.733, 285 s   <- gewaehlt
+  # pat20 stoppt deutlich zu frueh (Val-Kurve faellt noch); 285 s/Fold sind gegen ~7 h Gesamtlauf
+  # vernachlaessigbar und der Encoder wird ohnehin je Fold nur EINMAL trainiert (AE-Cache).
+  epochs_autoencoder:
+    - 2000
+  ae_batch_size:
+    - 32
+  ae_patience:
+    - 50
+  molgnet_pooling:
+    - mean_max
+  target_missing:
+    - missing
+  target_include_aligned:
+    - true
+  curve_weight_slope:
+    - 2.1821
+  curve_weight_bad_pec50_error:
+    - 1.0
+  curve_weight_mode:
+    - inverse_variance
+  curve_weight_tau:
+    - 0.2
+
+RandomForestAEMolGNetMutTrim:
+  cell_line_views:
+    - gene_expression
+  drug_views:
+    - molgnet_pooled
+  gene_list:
+    - tcga_autoencoder_genes_available
+  n_estimators:
+    - 100
+  max_depth:
+    - 30
+  max_samples:
+    - 0.2
+  n_jobs:
+    - -1
+  criterion:
+    - squared_error
+  ae_log2:
+    - true
+  # AE-Schedule aus Benchmark 2026-08-06 (815 Zelllinien x 11883 Gene, log2, Fold-Groesse real):
+  #   batch64/pat20 -> Stopp ep72,  best Val-MSE 0.970,  39 s
+  #   batch64/pat50 -> Stopp ep308, best Val-MSE 0.762, 166 s
+  #   batch32/pat50 -> Stopp ep280, best Val-MSE 0.733, 285 s   <- gewaehlt
+  # pat20 stoppt deutlich zu frueh (Val-Kurve faellt noch); 285 s/Fold sind gegen ~7 h Gesamtlauf
+  # vernachlaessigbar und der Encoder wird ohnehin je Fold nur EINMAL trainiert (AE-Cache).
+  epochs_autoencoder:
+    - 2000
+  ae_batch_size:
+    - 32
+  ae_patience:
+    - 50
+  molgnet_pooling:
+    - mean_max
+  target_missing:
+    - missing
+  target_include_aligned:
+    - true
+  curve_weight_slope:
+    - 2.1821
+  curve_weight_bad_pec50_error:
+    - 1.0
+  curve_weight_mode:
+    - trim
+
+# Drug-Level-Trim (2026-09-04): identisch zu RandomForestAEMolGNetMut, aber die Substanzen jenseits
+# der Rausch-Kante fehlen im TRAINING ganz. Nicht mit …Trim verwechseln -- das ist der pointwise Arm.
+RandomForestAEMolGNetMutDrugTrim:
+  cell_line_views:
+    - gene_expression
+  drug_views:
+    - molgnet_pooled
+  gene_list:
+    - tcga_autoencoder_genes_available
+  n_estimators:
+    - 100
+  max_depth:
+    - 30
+  max_samples:
+    - 0.2
+  n_jobs:
+    - -1
+  criterion:
+    - squared_error
+  ae_log2:
+    - true
+  # AE-Schedule wie im Referenzarm (Benchmark 2026-08-06); der Encoder kommt ohnehin aus dem Cache.
+  epochs_autoencoder:
+    - 2000
+  ae_batch_size:
+    - 32
+  ae_patience:
+    - 50
+  molgnet_pooling:
+    - mean_max
+  target_missing:
+    - missing
+  target_include_aligned:
+    - true
+  # Schwelle = die gemessene Kante: bis 50 % unbestimmbarer Kurven je Drug bleibt die Guete stabil
+  # (Median within-drug rho 0,414/0,417/0,424), darueber bricht sie weg (0,285 bzw. 0,004).
+  # Fuer die Variante "nur die 43 hoffnungslosen Drugs" genuegt drug_trim_max_bad_frac: 0.9.
+  drug_trim_bad_pec50_error:
+    - 1.0
+  drug_trim_max_bad_frac:
+    - 0.5
+  # Substanzen mit weniger als so vielen bewertbaren Trainingszeilen werden nicht beschnitten
+  # (Schaetzung des Anteils zu wacklig); in LCO/CTRPv2 bindet das nie.
+  drug_trim_min_curves:
+    - 10
+
+RandomForestAEMolGNetMutBJ:
+  cell_line_views:
+    - gene_expression
+  drug_views:
+    - molgnet_pooled
+  gene_list:
+    - tcga_autoencoder_genes_available
+  n_estimators:
+    - 100
+  max_depth:
+    - 30
+  max_samples:
+    - 0.2
+  n_jobs:
+    - -1
+  criterion:
+    - squared_error
+  ae_log2:
+    - true
+  # AE-Schedule aus Benchmark 2026-08-06 (815 Zelllinien x 11883 Gene, log2, Fold-Groesse real):
+  #   batch64/pat20 -> Stopp ep72,  best Val-MSE 0.970,  39 s
+  #   batch64/pat50 -> Stopp ep308, best Val-MSE 0.762, 166 s
+  #   batch32/pat50 -> Stopp ep280, best Val-MSE 0.733, 285 s   <- gewaehlt
+  # pat20 stoppt deutlich zu frueh (Val-Kurve faellt noch); 285 s/Fold sind gegen ~7 h Gesamtlauf
+  # vernachlaessigbar und der Encoder wird ohnehin je Fold nur EINMAL trainiert (AE-Cache).
+  epochs_autoencoder:
+    - 2000
+  ae_batch_size:
+    - 32
+  ae_patience:
+    - 50
+  molgnet_pooling:
+    - mean_max
+  target_missing:
+    - missing
+  target_include_aligned:
+    - true
+
+  # Buckley-James (2026-09-03): Ziel zensierter Zeilen je Runde auf max(Schranke, OOB-Vorhersage)
+  # setzen. bj_iterations = 1 waere exakt das gekappte Basismodell (gp20260903c_capped), 3 Runden
+  # kosten drei Fits je Fold statt einem -- Laufzeit x3 im RF-Teil, AE-Encoder unveraendert.
+  bj_iterations:
+    - 3
+  bj_update_source:
+    - oob
+  bj_tolerance:
+    - 0.001

@@ -108,7 +108,8 @@ class PrecilyModel(DRPModel):
         The network is built in train() once the input dimension
         (n_pathways + n_drug_features) is known.
 
-        :param hyperparameters: dropout, learning_rate, epochs, batch_size, seed
+        :param hyperparameters: dropout, learning_rate, epochs, batch_size, seed,
+            optional activation ("relu"/"leaky_relu") and negative_slope
         """
         self.log_hyperparameters(hyperparameters)
         self.hyperparameters = hyperparameters
@@ -142,6 +143,8 @@ class PrecilyModel(DRPModel):
         self.model = PrecilyNetwork(
             input_dim=input_dim,
             dropout=self.hyperparameters.get("dropout", 0.1),
+            activation=self.hyperparameters.get("activation", "relu"),
+            negative_slope=self.hyperparameters.get("negative_slope", 0.01),
         ).to(self.DEVICE)
 
         loss_func = nn.MSELoss()
@@ -340,6 +343,8 @@ class PrecilyModel(DRPModel):
             instance.model = PrecilyNetwork(
                 input_dim=instance.hyperparameters["input_dim"],
                 dropout=instance.hyperparameters.get("dropout", 0.1),
+                activation=instance.hyperparameters.get("activation", "relu"),
+                negative_slope=instance.hyperparameters.get("negative_slope", 0.01),
             ).to(instance.DEVICE)
             instance.model.load_state_dict(
                 torch.load(

@@ -1,14 +1,15 @@
 ---
+# REDUZIERTES Grid fürs Vollfeld-Ranking (Claude Code 2026-07-25): nur lr × num_layers × nhead
+# = 2×2×2 = 8 Konfigs × 5 Folds (statt Default 512 → unbrauchbar ~3 Wochen auf 4-GB-Karte).
+# Rest fest auf schnelle, speichersichere Defaults (VRAM-Peak beim Vollgrid-Test nur 455 MiB).
+# Original: hyperparameters.yaml.fullgrid.bak (User-Entscheidung 2026-07-25: "kleines Grid ~8 Konfigs").
 PharmaFormer:
   gene_hidden_size:
     - 2048
-    - 4096
   drug_hidden_size:
     - 128
-    - 256
   feature_dim:
     - 64
-    - 128
   nhead:
     - 4
     - 8
@@ -17,12 +18,9 @@ PharmaFormer:
     - 3
   dim_feedforward:
     - 1024
-    - 2048
   dropout:
     - 0.1
-    - 0.2
   batch_size:
-    - 64
     - 128
   lr:
     - 0.00001

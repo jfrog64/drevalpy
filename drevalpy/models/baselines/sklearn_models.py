@@ -30,6 +30,9 @@ class SklearnModel(DRPModel):
 
     cell_line_views = []
     drug_views = []
+    #: Gene list used for gene_expression. Overridable via the "gene_list" hyperparameter, mirroring the
+    #: TargetMut models. The default reproduces the previously hard-coded behaviour.
+    gene_list = "landmark_genes_reduced"
 
     def __init__(self):
         """
@@ -81,6 +84,9 @@ class SklearnModel(DRPModel):
         self.hyperparameters = hyperparameters
         self.cell_line_views = _get_view_as_list(hyperparameters.get("cell_line_views", ["gene_expression"]))
         self.drug_views = _get_view_as_list(hyperparameters.get("drug_views", ["fingerprints"]))
+        # Kept in self.hyperparameters, so save()/load() carry it and predict() uses the same gene space
+        # the model was trained on.
+        self.gene_list = hyperparameters.get("gene_list", type(self).gene_list)
 
         # proteomics features are not supported for all models
         if "proteomics" in self.cell_line_views:
@@ -110,7 +116,9 @@ class SklearnModel(DRPModel):
         :param dataset_name: Name of the dataset
         :returns: FeatureDataset containing the cell line features
         """
-        return load_single_cell_line_view(self.cell_line_views, data_path, dataset_name, self.get_model_name())
+        return load_single_cell_line_view(
+            self.cell_line_views, data_path, dataset_name, self.get_model_name(), gene_list=self.gene_list
+        )
 
     def load_drug_features(self, data_path: str, dataset_name: str) -> FeatureDataset | None:
         """
@@ -121,6 +129,32 @@ class SklearnModel(DRPModel):
         :returns: FeatureDataset containing the drug features
         """
         return load_single_drug_view(self.drug_views, data_path, dataset_name, self.get_model_name())
+
+    def _fit_kwargs(self, output: DrugResponseDataset) -> dict:
+        """Zusätzliche Argumente für ``fit`` — Erweiterungspunkt für Unterklassen.
+
+        Standardmäßig leer, damit sich am Verhalten der bestehenden Modelle nichts ändert.
+        Genutzt wird der Haken von :class:`_CurveQualityWeightMixin`, das hier ein
+        ``sample_weight`` aus der Qualität der Dosis-Wirkungs-Kurven einhängt.
+
+        :param output: Trainingsdatensatz (bereits transformiert)
+        :returns: Schlüsselwortargumente für ``self.model.fit``
+        """
+        return {}
+
+    def _fit_estimator(self, x: np.ndarray, output: DrugResponseDataset) -> None:
+        """Den sklearn-Schätzer auf die fertige Designmatrix fitten — Erweiterungspunkt.
+
+        Standardmäßig genau ein ``fit``. Ausgelagert, damit Unterklassen den Fit wiederholen
+        können, ohne die Featureaufbereitung von :meth:`train` erneut zu durchlaufen: ein
+        zweiter ``train``-Aufruf würde ``scale_gene_expression(training=True)`` erneut auf die
+        bereits skalierten Features anwenden (in-place) und die Daten damit verfälschen.
+        Genutzt wird der Haken von :class:`_BuckleyJamesMixin` (weitere BJ-Iterationen).
+
+        :param x: Designmatrix der Trainingszeilen
+        :param output: Trainingsdatensatz (bereits transformiert)
+        """
+        self.model.fit(x, output.response, **self._fit_kwargs(output))
 
     def train(
         self,
@@ -169,7 +203,7 @@ class SklearnModel(DRPModel):
                 cell_line_input=cell_line_input,
                 drug_input=drug_input,
             )
-            self.model.fit(x, output.response)
+            self._fit_estimator(x, output)
         else:
             print("No training data provided, will predict NA.")
             self.model = None

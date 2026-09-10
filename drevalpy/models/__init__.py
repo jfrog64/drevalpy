@@ -16,6 +16,19 @@ __all__ = [
     "ElasticNetTargetMut",
     "RandomForestTargetMut893",
     "ElasticNetTargetMut893",
+    "SingleDrugRandomForestTargetMut",
+    "RandomForest893",
+    "RandomForestAE",
+    "RandomForestAEMut",
+    "RandomForestMolGNet",
+    "RandomForestMolGNetMut",
+    "RandomForestAEMolGNet",
+    "RandomForestAEMolGNetMut",
+    "RandomForestAEMolGNetMutCW",
+    "RandomForestAEMolGNetMutTrim",
+    "RandomForestAEMolGNetMutBJ",
+    "RandomForestAEMolGNetMutDrugTrim",
+    "RandomForestAEMolGNetMutKern8",
     "ElasticNetGeneExpr",
     "ElasticNetGeneExpr893",
     "ElasticNetResid",
@@ -33,6 +46,10 @@ __all__ = [
     "MOLIR",
     "SuperFELTR",
     "DIPKModel",
+    "DIPK11883Model",
+    "DIPKLOGModel",
+    "DIPKTCGAModel",
+    "DIPKLOG2270Model",
     "DrugGNN",
     "PharmaFormerModel",
     "PrecilyModel",
@@ -45,6 +62,22 @@ __all__ = [
 ]
 
 from .baselines.multi_view_lightgbm import MultiViewLightGBM
+from .baselines.buckley_james import RandomForestAEMolGNetMutBJ
+from .baselines.curve_quality_weights import (
+    RandomForestAEMolGNetMutCW,
+    RandomForestAEMolGNetMutTrim,
+)
+from .baselines.dipk_feature_sklearn import (
+    RandomForest893,
+    RandomForestAE,
+    RandomForestAEMolGNet,
+    RandomForestAEMolGNetMut,
+    RandomForestAEMolGNetMutKern8,
+    RandomForestAEMut,
+    RandomForestMolGNet,
+    RandomForestMolGNetMut,
+)
+from .baselines.drug_level_trim import RandomForestAEMolGNetMutDrugTrim
 from .baselines.multi_view_random_forest import MultiViewRandomForest
 from .baselines.multi_view_xgboost import MultiViewXGBoost
 from .baselines.naive_pred import (
@@ -78,8 +111,13 @@ from .baselines.target_mut_sklearn import (
     ElasticNetTargetMut893,
     RandomForestTargetMut,
     RandomForestTargetMut893,
+    SingleDrugRandomForestTargetMut,
 )
 from .DIPK.dipk import DIPKModel
+from .DIPK11883.dipk11883 import DIPK11883Model
+from .DIPKLOG.dipklog import DIPKLOGModel
+from .DIPKLOG2270.dipklog2270 import DIPKLOG2270Model
+from .DIPKTCGA.dipktcga import DIPKTCGAModel
 from .drp_model import DRPModel
 from .DrugGNN import DrugGNN
 from .MOLIR.molir import MOLIR
@@ -95,6 +133,7 @@ from .SuperFELTR.superfeltr import SuperFELTR
 SINGLE_DRUG_MODEL_FACTORY: dict[str, type[DRPModel]] = {
     "SingleDrugElasticNet": SingleDrugElasticNet,
     "SingleDrugRandomForest": SingleDrugRandomForest,
+    "SingleDrugRandomForestTargetMut": SingleDrugRandomForestTargetMut,
     "MOLIR": MOLIR,
     "SuperFELTR": SuperFELTR,
 }
@@ -126,6 +165,19 @@ MULTI_DRUG_MODEL_FACTORY: dict[str, type[DRPModel]] = {
     "ElasticNetTargetMutResid": ElasticNetTargetMutResid,
     "ElasticNetTargetMutResid893": ElasticNetTargetMutResid893,
     "MultiViewRandomForest": MultiViewRandomForest,
+    # RF auf DIPKs Feature-Bausteinen (AE + gepooltes MolGNet), Ablations-Faktorial 2026-08-06
+    "RandomForest893": RandomForest893,
+    "RandomForestAE": RandomForestAE,
+    "RandomForestAEMut": RandomForestAEMut,
+    "RandomForestMolGNet": RandomForestMolGNet,
+    "RandomForestMolGNetMut": RandomForestMolGNetMut,
+    "RandomForestAEMolGNet": RandomForestAEMolGNet,
+    "RandomForestAEMolGNetMut": RandomForestAEMolGNetMut,
+    "RandomForestAEMolGNetMutCW": RandomForestAEMolGNetMutCW,
+    "RandomForestAEMolGNetMutTrim": RandomForestAEMolGNetMutTrim,
+    "RandomForestAEMolGNetMutBJ": RandomForestAEMolGNetMutBJ,
+    "RandomForestAEMolGNetMutDrugTrim": RandomForestAEMolGNetMutDrugTrim,
+    "RandomForestAEMolGNetMutKern8": RandomForestAEMolGNetMutKern8,
     "SVR": SVMRegressor,
     # Other Baselines
     "DrugGNN": DrugGNN,
@@ -135,6 +187,10 @@ MULTI_DRUG_MODEL_FACTORY: dict[str, type[DRPModel]] = {
     "MultiViewLightGBM": MultiViewLightGBM,
     # Published models
     "DIPK": DIPKModel,
+    "DIPK11883": DIPK11883Model,  # DIPK auf dem TCGA-Autoencoder-Genraum (11.883 statt 2.270 Gene)
+    "DIPKLOG": DIPKLOGModel,  # dito, aber log2(TPM+1) statt linearer TPM (Kontrolle Aufgabe B)
+    "DIPKTCGA": DIPKTCGAModel,  # dito, Gen-Autoencoder auf TCGA vortrainiert (Aufgabe B Stufe 2)
+    "DIPKLOG2270": DIPKLOG2270Model,  # Stock-Genliste (2.270), aber log2(TPM+1) -- isoliert den Skaleneffekt
     "PharmaFormer": PharmaFormerModel,
     "SRMF": SRMF,
     "Precily": PrecilyModel,

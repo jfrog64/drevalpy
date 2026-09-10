@@ -9,6 +9,7 @@ import warnings
 from pathlib import Path
 from typing import Any
 
+import joblib
 import numpy as np
 import pandas as pd
 import torch
@@ -441,16 +442,27 @@ def drug_response_experiment(
                         response_transformation=response_transformation,
                     )
 
-        if final_model_on_full_data and (model_class not in baselines):
+        # Single drug models are exempt from the baseline exclusion: they are only ever run as baselines,
+        # so excluding baselines would make a final/production model unreachable for them entirely.
+        if final_model_on_full_data and (model_class not in baselines or model_class.is_single_drug_model):
             final_model_path = generate_data_saving_path(
                 model_name=model_name,
                 drug_id=drug_id,
                 result_path=result_path,
                 suffix="final_model",
             )
+            final_dataset = response_data.copy()
+            if model_class.is_single_drug_model:
+                if test_mode == "LDO":
+                    # A single drug model cannot generalize to unseen drugs, and the validation split
+                    # would be drawn from a single group.
+                    raise ValueError(f"{model_name} is a single drug model and cannot train a final model in LDO mode.")
+                # One model per drug: the final model must see only this drug's rows. Without the mask it
+                # would be trained on the whole panel while being stored under drugs/<drug_id>/final_model.
+                final_dataset.mask(final_dataset.drug_ids == drug_id)
             train_final_model(
                 model_class=model_class,
-                full_dataset=response_data.copy(),
+                full_dataset=final_dataset,
                 response_transformation=response_transformation,
                 path_data=path_data,
                 model_checkpoint_dir=model_checkpoint_dir,
@@ -615,6 +627,52 @@ def consolidate_single_drug_model_predictions(
                     )
 
 
+#: Cache for loaded feature matrices, keyed by everything they depend on.
+#:
+#: Feature matrices depend only on (model class, hyperparameters, data path, dataset) — not on the CV
+#: split and not on the drug. For single drug models the pipeline nevertheless walks the whole split
+#: loop once PER DRUG, so the same matrix was re-read from disk six times per drug (5 splits + final
+#: model). Measured on a 545 drug CTRPv2 run with 893 genes: 17.8 s per load, 3270 loads, roughly 16 h
+#: of an 18.4 h total runtime.
+#:
+#: Reusing one object is safe because every consumer only reads it and hands it on via .copy()
+#: (train_and_predict, train_final_model, cross_study_prediction, randomization_test).
+#: Set DREVAL_FEATURE_CACHE=0 to disable, e.g., to A/B check that results are unchanged.
+_FEATURE_CACHE: dict[tuple, Any] = {}
+
+#: Kept small on purpose: an entry is a full feature matrix, and the access pattern is "same key many
+#: times in a row", so a couple of slots already give the full speedup.
+_FEATURE_CACHE_MAXSIZE = 4
+
+
+def _load_features_cached(model: DRPModel, path_data: str, dataset_name: str, kind: str) -> FeatureDataset | None:
+    """
+    Load cell line or drug features, reusing an already loaded matrix when nothing they depend on changed.
+
+    :param model: built model, i.e., build_model() was already called so hyperparameters are set
+    :param path_data: path to the data directory, e.g., data/
+    :param dataset_name: name of the dataset, e.g., GDSC2
+    :param kind: either "cell_line" or "drug"
+    :returns: the feature dataset, or None if the model does not use this kind of feature
+    """
+    loader = model.load_cell_line_features if kind == "cell_line" else model.load_drug_features
+    if os.environ.get("DREVAL_FEATURE_CACHE", "1") == "0":
+        return loader(data_path=path_data, dataset_name=dataset_name)
+    # The hyperparameters decide which views and which gene list are loaded, so they belong in the key.
+    key = (
+        type(model).__name__,
+        kind,
+        path_data,
+        dataset_name,
+        json.dumps(getattr(model, "hyperparameters", {}), sort_keys=True, default=str),
+    )
+    if key not in _FEATURE_CACHE:
+        if len(_FEATURE_CACHE) >= _FEATURE_CACHE_MAXSIZE:
+            _FEATURE_CACHE.pop(next(iter(_FEATURE_CACHE)))
+        _FEATURE_CACHE[key] = loader(data_path=path_data, dataset_name=dataset_name)
+    return _FEATURE_CACHE[key]
+
+
 def load_features(
     model: DRPModel, path_data: str, dataset: DrugResponseDataset
 ) -> tuple[FeatureDataset, FeatureDataset | None]:
@@ -626,8 +684,8 @@ def load_features(
     :param dataset: dataset to load features for, e.g., GDSC2
     :returns: tuple of cell line and, potentially, drug features
     """
-    cl_features = model.load_cell_line_features(data_path=path_data, dataset_name=dataset.dataset_name)
-    drug_features = model.load_drug_features(data_path=path_data, dataset_name=dataset.dataset_name)
+    cl_features = _load_features_cached(model, path_data, dataset.dataset_name, "cell_line")
+    drug_features = _load_features_cached(model, path_data, dataset.dataset_name, "drug")
     return cl_features, drug_features
 
 
@@ -1092,10 +1150,10 @@ def train_and_predict(
         raise ValueError("train_dataset must have a dataset_name")
     if cl_features is None:
         print("Loading cell line features ...")
-        cl_features = model.load_cell_line_features(data_path=path_data, dataset_name=train_dataset.dataset_name)
+        cl_features = _load_features_cached(model, path_data, train_dataset.dataset_name, "cell_line")
     if drug_features is None:
         print("Loading drug features ...")
-        drug_features = model.load_drug_features(data_path=path_data, dataset_name=train_dataset.dataset_name)
+        drug_features = _load_features_cached(model, path_data, train_dataset.dataset_name, "drug")
 
     cell_lines_to_keep = cl_features.identifiers if cl_features is not None else None
     drugs_to_keep = drug_features.identifiers if drug_features is not None else None
@@ -1604,8 +1662,8 @@ def train_final_model(
     print(f"Best hyperparameters for final model: {best_hpams}")
     model.build_model(hyperparameters=best_hpams)
 
-    cl_features = model.load_cell_line_features(data_path=path_data, dataset_name=full_dataset.dataset_name)
-    drug_features = model.load_drug_features(data_path=path_data, dataset_name=full_dataset.dataset_name)
+    cl_features = _load_features_cached(model, path_data, full_dataset.dataset_name, "cell_line")
+    drug_features = _load_features_cached(model, path_data, full_dataset.dataset_name, "drug")
     cell_lines_to_keep = cl_features.identifiers
     drugs_to_keep = drug_features.identifiers if drug_features is not None else None
 
@@ -1616,16 +1674,21 @@ def train_final_model(
     if len(train_dataset) < len_train_before:
         print(f"Reduced training dataset from {len_train_before} to {len(train_dataset)}, due to missing features")
 
+    # The early stopping set must be reduced to available features in EVERY case, not only when a
+    # response transformation is used: otherwise model.train() sees cell lines without features and
+    # aborts (AssertionError in FeatureDataset.get_feature_matrix).
+    if early_stopping_dataset is not None:
+        len_early_stopping_before = len(early_stopping_dataset)
+        early_stopping_dataset.reduce_to(cell_line_ids=cell_lines_to_keep, drug_ids=drugs_to_keep)
+        if len(early_stopping_dataset) < len_early_stopping_before:
+            print(
+                f"Reduced early stopping dataset from {len_early_stopping_before} to "
+                f"{len(early_stopping_dataset)}, due to missing features"
+            )
+
     if response_transformation:
         train_dataset.fit_transform(response_transformation)
         if early_stopping_dataset is not None:
-            len_early_stopping_before = len(early_stopping_dataset)
-            early_stopping_dataset.reduce_to(cell_line_ids=cell_lines_to_keep, drug_ids=drugs_to_keep)
-            if len(early_stopping_dataset) < len_early_stopping_before:
-                print(
-                    f"Reduced early stopping dataset from {len_early_stopping_before} to "
-                    f"{len(early_stopping_dataset)}, due to missing features"
-                )
             early_stopping_dataset.transform(response_transformation)
 
     drug_features = drug_features.copy() if drug_features is not None else None
@@ -1643,6 +1706,11 @@ def train_final_model(
 
     os.makedirs(final_model_path, exist_ok=True)
     model.save(final_model_path)
+    if response_transformation is not None:
+        # The fitted transformation is part of the production model: without it, predictions of a
+        # model trained on a transformed target (e.g. drug-mean residuals) cannot be mapped back
+        # to the original response scale.
+        joblib.dump(response_transformation, os.path.join(final_model_path, "response_transformation.pkl"))
 
 
 @pipeline_function
