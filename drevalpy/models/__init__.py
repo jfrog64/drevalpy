@@ -42,6 +42,7 @@ __all__ = [
     "SingleDrugRandomForest",
     "SingleDrugElasticNet",
     "SRMF",
+    "EnsembleMF",
     "GradientBoosting",
     "MOLIR",
     "SuperFELTR",
@@ -120,6 +121,7 @@ from .DIPKLOG2270.dipklog2270 import DIPKLOG2270Model
 from .DIPKTCGA.dipktcga import DIPKTCGAModel
 from .drp_model import DRPModel
 from .DrugGNN import DrugGNN
+from .EnsembleMF import EnsembleMF
 from .MOLIR.molir import MOLIR
 from .PharmaFormer.pharmaformer import PharmaFormerModel
 from .Precily import PrecilyModel
@@ -193,6 +195,7 @@ MULTI_DRUG_MODEL_FACTORY: dict[str, type[DRPModel]] = {
     "DIPKLOG2270": DIPKLOG2270Model,  # Stock-Genliste (2.270), aber log2(TPM+1) -- isoliert den Skaleneffekt
     "PharmaFormer": PharmaFormerModel,
     "SRMF": SRMF,
+    "EnsembleMF": EnsembleMF,
     "Precily": PrecilyModel,
     "SparseGO": SparseGOModel,
 }

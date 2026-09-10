@@ -30,9 +30,9 @@ class SklearnModel(DRPModel):
 
     cell_line_views = []
     drug_views = []
-    #: Gene list used for gene_expression. Overridable via the "gene_list" hyperparameter, mirroring the
-    #: TargetMut models. The default reproduces the previously hard-coded behaviour.
-    gene_list = "landmark_genes_reduced"
+    #: Gene list used to subset gene_expression. Overridable via the "gene_list" hyperparameter.
+    #: The default reproduces the previously hard-coded behaviour.
+    gene_list: str | None = "landmark_genes_reduced"
 
     def __init__(self):
         """
@@ -84,8 +84,8 @@ class SklearnModel(DRPModel):
         self.hyperparameters = hyperparameters
         self.cell_line_views = _get_view_as_list(hyperparameters.get("cell_line_views", ["gene_expression"]))
         self.drug_views = _get_view_as_list(hyperparameters.get("drug_views", ["fingerprints"]))
-        # Kept in self.hyperparameters, so save()/load() carry it and predict() uses the same gene space
-        # the model was trained on.
+        # Kept in self.hyperparameters, so save()/load() carry it and predict() uses the same gene
+        # space the model was trained on.
         self.gene_list = hyperparameters.get("gene_list", type(self).gene_list)
 
         # proteomics features are not supported for all models
