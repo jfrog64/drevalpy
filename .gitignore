@@ -177,3 +177,17 @@ cython_debug/
 /data/GDSC/
 .Rproj.user
 .idea/
+
+# --- Lokale Arbeitsablagen dieses Playground-Klons (kein drevalpy-Code) -------------
+# Grund: diese Verzeichnisse liegen unversioniert im Arbeitsbaum und waeren von einem
+# versehentlichen `git add -A` mitgenommen worden (so kam die 32-MB-Datei go-basic.obo
+# in PR #468 und machte die CI rot). Groessen zum Zeitpunkt der Aufnahme 2026-09-11:
+# cdr_infer 410 MB, TEMPORARY 228 MB, go-basic.obo 31 MB.
+/cdr_infer/
+/TEMPORARY/
+/go-basic.obo
+/.nextflow/
+/.nextflow.log*
+/.vscode/
+*.bak
+*.bak_*
