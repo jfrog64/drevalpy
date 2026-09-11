@@ -688,6 +688,94 @@ RandomForestAEMolGNetMut:
   target_include_aligned:
     - true
 
+# Aufgabe L1 (2026-09-11): identisch zu RandomForestAEMolGNetMut, zusaetzlich DIPKs dritter
+# Baustein BNF -- der Mittelwert der BIONIC-Netzwerkvektoren (512) der hoechstexprimierten Gene.
+# Variante "drevalpy" = die Auswahlregel, die drevalpy tatsaechlich implementiert: Rangliste ueber
+# die UNGEFILTERTE Expressionsmatrix (CTRPv2: 42 209 Gene), k=512, Filter gegen gene_list_sel und
+# die BIONIC-Tabelle erst DANACH -> im Median bleiben nur 120 gemittelte Vektoren uebrig.
+RandomForestAEMolGNetMutBNF:
+  cell_line_views:
+    - gene_expression
+  drug_views:
+    - molgnet_pooled
+  gene_list:
+    - tcga_autoencoder_genes_available
+  n_estimators:
+    - 100
+  max_depth:
+    - 30
+  max_samples:
+    - 0.2
+  n_jobs:
+    - -1
+  criterion:
+    - squared_error
+  ae_log2:
+    - true
+  epochs_autoencoder:
+    - 2000
+  ae_batch_size:
+    - 32
+  ae_patience:
+    - 50
+  molgnet_pooling:
+    - mean_max
+  target_missing:
+    - missing
+  target_include_aligned:
+    - true
+  bnf_variant:
+    - drevalpy
+  bnf_gene_add_num:
+    - 512
+  # Kein Standardisierer: RandomForest ist gegen monotone Transformationen einzelner Spalten
+  # invariant. Fuer lineare Modelle waere bnf_standardize: true noetig.
+  bnf_standardize:
+    - false
+
+# Aufgabe L1, Gegenstueck (2026-09-11): dieselbe Architektur, aber die BNF-Auswahlregel der
+# PUBLIKATION (Li et al. 2024; Original-Repo user15632/DIPK und daisybios preprocess_drp_data):
+# Rangliste INNERHALB von gene_list_sel (CTRPv2: 5472 vorhandene Gene), k=256
+# -> im Median 215 statt 120 gemittelte Vektoren. Der Vergleich der beiden Arme beantwortet,
+# ob drevalpys Abweichung das Ergebnis aendert (Grundlage fuer Aufgabe L2).
+RandomForestAEMolGNetMutBNForig:
+  cell_line_views:
+    - gene_expression
+  drug_views:
+    - molgnet_pooled
+  gene_list:
+    - tcga_autoencoder_genes_available
+  n_estimators:
+    - 100
+  max_depth:
+    - 30
+  max_samples:
+    - 0.2
+  n_jobs:
+    - -1
+  criterion:
+    - squared_error
+  ae_log2:
+    - true
+  epochs_autoencoder:
+    - 2000
+  ae_batch_size:
+    - 32
+  ae_patience:
+    - 50
+  molgnet_pooling:
+    - mean_max
+  target_missing:
+    - missing
+  target_include_aligned:
+    - true
+  bnf_variant:
+    - orig
+  bnf_gene_add_num:
+    - 256
+  bnf_standardize:
+    - false
+
 # Aufgabe A1, Option (b) (2026-09-10): identisch zu RandomForestAEMolGNetMut, nur speist sich das
 # Mut-Feature aus dem 8-Gen-Panel-Kern (AKT1 BRAF ERBB2 KRAS NRAS PIK3CA PTEN TP53) statt aus allen
 # 24 Genen. RAS_MAPK darin ohne NF1 (NF1 ist in nur einem der sechs Panels), PI3K_AKT unveraendert.

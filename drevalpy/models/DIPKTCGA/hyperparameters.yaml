@@ -1,0 +1,29 @@
+---
+DIPKTCGA:
+  batch_size:
+    - 64
+  lr:
+    - 0.0001
+  heads:
+    - 2
+  fc_layer_num:
+    - 3
+  fc_layer_dim:
+    - - 256
+      - 128
+      - 64
+      - 32
+      - 16
+      - 1
+  dropout_rate:
+    - 0.3
+  epochs:
+    - 100
+  epochs_autoencoder:
+    - 100
+  patience:
+    - 10
+  pretrained_encoder_dir:
+    - /mnt/data/genomics/CDR/DrEval/results/pretrained_encoders/tcga_ae11883_20260803
+  lr_autoencoder_finetune:
+    - 0.00001
